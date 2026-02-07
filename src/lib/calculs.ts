@@ -21,6 +21,7 @@ export const calculateImportFees = ({ priceEuro, engineSize, fuelType }: Calcula
   const transportFees = 800; // Estimation forfaitaire transport ferry (Marseille-Alger)
   
   return {
+    taxRate,
     customsFees,
     transportFees,
     totalDZD: (priceEuro + customsFees + transportFees) * 230, // Taux Square indicatif

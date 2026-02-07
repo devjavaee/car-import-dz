@@ -83,6 +83,19 @@ export default function SimulateurPage() {
             
             {results && (
               <div className="space-y-4">
+                {/* ALERTE TAXE ÉLEVÉE */}
+                {results.taxRate >= 0.80 && (
+                  <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-800 p-3 rounded mb-4 animate-pulse">
+                    <p className="font-bold text-sm">⚠️ Attention</p>
+                    <p className="text-xs">Cylindrée élevée : les taxes douanières dépassent 80% du prix.</p>
+                  </div>
+                )}
+
+                <div className="flex justify-between border-b border-blue-400 pb-2">
+                  <span>Taux appliqué :</span>
+                  <span className="font-mono">{(results.taxRate * 100)} %</span>
+                </div>
+
                 <div className="flex justify-between border-b border-blue-400 pb-2">
                   <span>Douane & Taxes :</span>
                   <span className="font-mono">{results.customsFees.toLocaleString()} €</span>
