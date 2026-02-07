@@ -1,50 +1,48 @@
-import Image from 'next/image';
 import Link from 'next/link';
 // On importe notre fonction de calcul
 import { calculateImportFees } from "@/lib/calculs";
+import Image from 'next/image';
 
-
-// 1. On définit l'interface pour être carré avec TypeScript
-interface Car {
-  id: string;
-  make: string;
-  model: string;
-  year_of_registration: number;
-  price_euro: number;
-  fuel_type: string;
-  engine_size: number;
-  images: string[] | null; // On précise que c'est un tableau de textes ou null
-}
-interface CarCardProps {
-  car: Car;
+interface CarProps {
+  car: {
+    id: string;
+    make: string;
+    model: string;
+    year_of_registration: number;
+    price_euro: number;
+    fuel_type: string;
+    engine_size: number;
+    images: string[] | null; // On précise que c'est un tableau de textes ou null
+  };
 }
 
-export default function CarCard({ car }: CarCardProps) {
+export default function CarCard({ car }: CarProps) {
   // On calcule les frais complets pour cette voiture spécifique
   const fees = calculateImportFees({
     priceEuro: car.price_euro,
     engineSize: car.engine_size,
     fuelType: car.fuel_type as any,
   });
-  // 2. On sécurise l'accès à l'image
-  const mainImage = (car.images && car.images.length > 0) ? car.images[0] : null;
 
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
-      <div className="relative h-48 w-full bg-gray-200">
-              {mainImage ? (
-                <Image 
-                  src={mainImage} 
-                  alt={`${car.make} ${car.model}`}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-xs">
-                  Pas de photo disponible
-                </div>
-              )}
-            </div>
+    
+
+
+<div className="relative h-48 w-full bg-gray-200">
+  {car.images && car.images[0] ? (
+    <Image 
+      src={car.images[0]} 
+      alt={`${car.make} ${car.model}`}
+      fill
+      className="object-cover"
+    />
+  ) : (
+    <div className="flex items-center justify-center h-full text-gray-400 text-xs">
+      Pas de photo disponible
+    </div>
+  )}
+</div>
 
       <div className="p-5">
         <div className="flex justify-between items-start mb-2">
