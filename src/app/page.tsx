@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import CarCard from '@/components/CarCard';
-
+export const revalidate = 0; // Cela force la page à se recharger à chaque visite
 export default async function Home() {
   // Fetch des données depuis Supabase
   const { data: cars, error } = await supabase
