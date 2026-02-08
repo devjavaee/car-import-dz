@@ -1,94 +1,135 @@
-import Link from 'next/link';
-// On importe notre fonction de calcul
-import { calculateImportFees } from "@/lib/calculs";
-import Image from 'next/image';
+"use client";
 
-interface CarProps {
-  car: {
-    id: string;
-    make: string;
-    model: string;
-    year_of_registration: number;
-    price_euro: number;
-    fuel_type: string;
-    engine_size: number;
-    images: string[] | null; // On précise que c'est un tableau de textes ou null
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+export default function AdminPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  // LE MOT DE PASSE "SECRET" (Dans un vrai projet, on utilise Supabase Auth)
+  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;// v 
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+    } else {
+      alert("Mot de passe incorrect !");
+    }
   };
-}
 
-export default function CarCard({ car }: CarProps) {
-  // On calcule les frais complets pour cette voiture spécifique
-  const fees = calculateImportFees({
-    priceEuro: car.price_euro,
-    engineSize: car.engine_size,
-    fuelType: car.fuel_type as any,
-  });
-
-  return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
     
+    const formData = new FormData(e.currentTarget);
+    
+    const newCar = {
+      make: formData.get("make") as string,
+      model: formData.get("model") as string,
+      year_of_registration: parseInt(formData.get("year") as string),
+      price_euro: parseFloat(formData.get("price") as string),
+      fuel_type: formData.get("fuel") as string,
+      engine_size: parseInt(formData.get("engine") as string),
+      mileage: parseInt(formData.get("mileage") as string),
+      first_registration_date: formData.get("date") as string,
+      images: [formData.get("imageUrl") as string],
+    };
 
+    const { error } = await supabase.from("cars").insert([newCar]);
 
-<div className="relative h-48 w-full bg-gray-200">
-  {car.images && car.images[0] ? (
-    <Image 
-      src={car.images[0]} 
-      alt={`${car.make} ${car.model}`}
-      fill
-      className="object-cover"
-    />
-  ) : (
-    <div className="flex items-center justify-center h-full text-gray-400 text-xs">
-      Pas de photo disponible
-    </div>
-  )}
-</div>
+    if (error) {
+      setMessage("Erreur : " + error.message);
+    } else {
+      setMessage("Voiture ajoutée avec succès ! ✅");
+      (e.target as HTMLFormElement).reset();
+    }
+    setLoading(false);
+  };
 
-      <div className="p-5">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-gray-900">
-            {car.make} {car.model}
-          </h3>
-          <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
-            {car.year_of_registration}
-          </span>
-        </div>
-
-        <div className="flex gap-2 mb-4">
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded capitalize">
-            {car.fuel_type}
-          </span>
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-            {car.engine_size} cm³
-          </span>
-        </div>
-
-        {/* AFFICHAGE DES PRIX */}
-        <div className="space-y-3">
-          <div className="flex justify-between items-end">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Prix Europe</p>
-              <p className="text-lg font-bold text-gray-700">
-                {car.price_euro.toLocaleString()} €
-              </p>
-            </div>
-            <Link 
-              href={`/cars/${car.id}`}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              Voir détails
-            </Link>
-          </div>
-
-          {/* Ton ajout : Le prix total estimé en DA */}
-          <div className="pt-3 border-t border-dashed border-gray-200">
-            <p className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">Total rendu Alger (Est.)</p>
-            <p className="text-xl font-black text-blue-800">
-              {Math.round(fees.totalDZD).toLocaleString()} DA
-            </p>
-          </div>
-        </div>
+  // 1. SI PAS CONNECTÉ : ON AFFICHE LE VÉRROU
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <form onSubmit={handleLogin} className="bg-white p-8 rounded-xl shadow-lg w-96 text-center">
+          <h1 className="text-2xl font-bold mb-6 text-gray-800">Accès Admin 🔒</h1>
+          <input 
+            type="password" 
+            placeholder="Entrez le mot de passe"
+            className="w-full p-3 border border-gray-300 rounded-lg mb-4 outline-none focus:ring-2 focus:ring-blue-500"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button type="submit" className="w-full bg-gray-900 text-white p-3 rounded-lg font-bold hover:bg-black transition-colors">
+            Se connecter
+          </button>
+        </form>
       </div>
-    </div>
+    );
+  }
+
+  // 2. SI CONNECTÉ : ON AFFICHE LE FORMULAIRE D'AJOUT
+  return (
+    <main className="min-h-screen bg-gray-50 p-10">
+      <div className="max-w-2xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-extrabold text-gray-900">Panneau d'administration</h1>
+          <button 
+            onClick={() => setIsAuthenticated(false)}
+            className="text-sm text-red-600 hover:underline"
+          >
+            Déconnexion
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-4 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+          {/* ... (Garder le même contenu du formulaire qu'avant) ... */}
+          <div className="grid grid-cols-2 gap-4">
+            <input name="make" placeholder="Marque (ex: VW)" className="border p-3 rounded-lg" required />
+            <input name="model" placeholder="Modèle (ex: Golf 8)" className="border p-3 rounded-lg" required />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <input name="year" type="number" placeholder="Année" className="border p-3 rounded-lg" required />
+            <input name="price" type="number" placeholder="Prix en Euro" className="border p-3 rounded-lg" required />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <input name="engine" type="number" placeholder="Cylindrée (cm3)" className="border p-3 rounded-lg" required />
+            <input name="mileage" type="number" placeholder="Kilométrage" className="border p-3 rounded-lg" required />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-sm text-gray-500 mb-1">Date de mise en circulation (doit avoir moins de 3 ans)</label>
+            <input name="date" type="date" className="border p-3 rounded-lg" required />
+          </div>
+          
+          <select name="fuel" className="border p-3 w-full rounded-lg bg-white">
+            <option value="essence">Essence</option>
+            <option value="hybride">Hybride</option>
+            <option value="electrique">Électrique</option>
+          </select>
+
+          <input name="imageUrl" placeholder="Lien de l'image" className="border p-3 w-full rounded-lg" />
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold hover:bg-blue-700 disabled:bg-gray-400 shadow-md transition-all"
+          >
+            {loading ? "Enregistrement..." : "Ajouter au catalogue"}
+          </button>
+
+          {message && (
+            <div className={`p-4 rounded-lg text-center font-bold ${message.includes("Erreur") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+              {message}
+            </div>
+          )}
+        </form>
+      </div>
+    </main>
   );
 }

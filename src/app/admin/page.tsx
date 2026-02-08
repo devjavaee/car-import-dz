@@ -8,6 +8,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [file, setFile] = useState<File | null>(null);
 
   // LE MOT DE PASSE "SECRET" (Dans un vrai projet, on utilise Supabase Auth)
   const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;// v 
@@ -22,11 +23,36 @@ export default function AdminPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    
+  e.preventDefault();
+  setLoading(true);
+  setMessage("");
+
+  try {
     const formData = new FormData(e.currentTarget);
-    
+    let imageUrl = "";
+
+    // --- ÉTAPE A : UPLOAD DE L'IMAGE ---
+    if (file) {
+      // On crée un nom de fichier unique (ex: 17054321-ma-voiture.jpg)
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}-${Date.now()}.${fileExt}`;
+      const filePath = `cars/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('car-images') // Ton nom de bucket
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // On récupère l'URL publique
+      const { data: { publicUrl } } = supabase.storage
+        .from('car-images')
+        .getPublicUrl(filePath);
+      
+      imageUrl = publicUrl;
+    }
+
+    // --- ÉTAPE B : INSERTION DANS LA BASE ---
     const newCar = {
       make: formData.get("make") as string,
       model: formData.get("model") as string,
@@ -36,19 +62,22 @@ export default function AdminPage() {
       engine_size: parseInt(formData.get("engine") as string),
       mileage: parseInt(formData.get("mileage") as string),
       first_registration_date: formData.get("date") as string,
-      images: [formData.get("imageUrl") as string],
+      images: imageUrl ? [imageUrl] : [], // On insère l'URL générée
     };
 
-    const { error } = await supabase.from("cars").insert([newCar]);
+    const { error: insertError } = await supabase.from("cars").insert([newCar]);
+    if (insertError) throw insertError;
 
-    if (error) {
-      setMessage("Erreur : " + error.message);
-    } else {
-      setMessage("Voiture ajoutée avec succès ! ✅");
-      (e.target as HTMLFormElement).reset();
-    }
+    setMessage("Voiture et image ajoutées avec succès ! 🚀");
+    setFile(null); // Reset du fichier
+    (e.target as HTMLFormElement).reset();
+
+  } catch (error: any) {
+    setMessage("Erreur : " + error.message);
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   // 1. SI PAS CONNECTÉ : ON AFFICHE LE VÉRROU
   if (!isAuthenticated) {
@@ -113,7 +142,15 @@ export default function AdminPage() {
             <option value="electrique">Électrique</option>
           </select>
 
-          <input name="imageUrl" placeholder="Lien de l'image" className="border p-3 w-full rounded-lg" />
+          <div className="flex flex-col">
+            <label className="text-sm text-gray-500 mb-1 font-semibold">Photo du véhicule</label>
+            <input 
+              type="file" 
+              accept="image/*"
+              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+              className="border p-2 w-full rounded-lg bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+          </div>
 
           <button 
             type="submit" 
