@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from '@/lib/supabase';
 import CarCard from '@/components/CarCard';
-import { Search, Fuel, Banknote, RotateCcw } from "lucide-react";
+import { Search, Fuel, Banknote, RotateCcw, Plus } from "lucide-react";
 
 export default function Home() {
   const [allCars, setAllCars] = useState<any[]>([]);
   const [filteredCars, setFilteredCars] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // ÉTAT DE PAGINATION
+  const [displayLimit, setDisplayLimit] = useState(9);
 
   // ÉTATS DES FILTRES
   const [searchTerm, setSearchTerm] = useState("");
@@ -38,7 +41,6 @@ export default function Home() {
   useEffect(() => {
     let result = [...allCars];
 
-    // Filtre texte
     if (searchTerm) {
       result = result.filter(car => 
         car.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -46,22 +48,18 @@ export default function Home() {
       );
     }
 
-    // Filtre Marque
     if (selectedMake) {
       result = result.filter(car => car.make === selectedMake);
     }
 
-    // Filtre Carburant
     if (selectedFuel) {
       result = result.filter(car => car.fuel_type === selectedFuel);
     }
 
-    // Filtre Prix Max (sur le prix d'achat Euro)
     if (maxPrice !== "" && maxPrice > 0) {
       result = result.filter(car => car.price_euro <= maxPrice);
     }
 
-    // Tri
     result.sort((a, b) => {
       if (sortBy === "price-asc") return a.price_euro - b.price_euro;
       if (sortBy === "price-desc") return b.price_euro - a.price_euro;
@@ -69,10 +67,15 @@ export default function Home() {
     });
 
     setFilteredCars(result);
+    // On remet la limite à 9 quand on change les filtres pour rester cohérent
+    setDisplayLimit(9); 
   }, [searchTerm, selectedMake, selectedFuel, maxPrice, sortBy, allCars]);
 
   const uniqueMakes = Array.from(new Set(allCars.map(c => c.make))).sort();
   const uniqueFuels = Array.from(new Set(allCars.map(c => c.fuel_type))).sort();
+
+  // Découpage des voitures pour la pagination
+  const carsToDisplay = filteredCars.slice(0, displayLimit);
 
   const resetFilters = () => {
     setSearchTerm("");
@@ -80,6 +83,7 @@ export default function Home() {
     setSelectedFuel("");
     setMaxPrice("");
     setSortBy("newest");
+    setDisplayLimit(9);
   };
 
   if (loading) return (
@@ -106,7 +110,6 @@ export default function Home() {
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* Recherche */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input 
@@ -118,7 +121,6 @@ export default function Home() {
               />
             </div>
 
-            {/* Marque */}
             <select 
               className="p-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
               value={selectedMake}
@@ -130,7 +132,6 @@ export default function Home() {
               ))}
             </select>
 
-            {/* Carburant */}
             <div className="relative">
               <Fuel className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <select 
@@ -145,7 +146,6 @@ export default function Home() {
               </select>
             </div>
 
-            {/* Prix Max */}
             <div className="relative">
               <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input 
@@ -180,10 +180,26 @@ export default function Home() {
 
         {/* GRILLE DE RÉSULTATS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredCars.map((car) => (
+          {carsToDisplay.map((car) => (
             <CarCard key={car.id} car={car} />
           ))}
         </div>
+
+        {/* BOUTON CHARGER PLUS (PAGINATION) */}
+        {displayLimit < filteredCars.length && (
+          <div className="mt-12 flex flex-col items-center gap-4">
+            <p className="text-sm text-gray-500 font-medium">
+              Affichage de {displayLimit} sur {filteredCars.length} véhicules
+            </p>
+            <button 
+              onClick={() => setDisplayLimit(prev => prev + 9)}
+              className="flex items-center gap-2 bg-white border-2 border-blue-100 px-8 py-3 rounded-2xl font-bold text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              Afficher plus de véhicules
+            </button>
+          </div>
+        )}
 
         {/* MESSAGE VIDE */}
         {filteredCars.length === 0 && (
