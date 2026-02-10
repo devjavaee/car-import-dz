@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { Calendar, Fuel, Gauge, ExternalLink } from "lucide-react";
 // On importe notre fonction de calcul
 import { calculateImportFees } from "@/lib/calculs";
 
@@ -27,43 +28,41 @@ export default function CarCard({ car }: CarCardProps) {
     fuelType: car.fuel_type as any,
   });
   // 2. On sécurise l'accès à l'image
-  const mainImage = (car.images && car.images.length > 0) ? car.images[0] : null;
+ const mainImage = (car.images && car.images.length > 0) ? car.images[0] : "/placeholder-car.jpg";
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
-      <div className="relative h-48 w-full bg-gray-200">
-              {mainImage ? (
-                <Image 
-                  src={mainImage} 
-                  alt={`${car.make} ${car.model}`}
-                  fill
-                  className="object-cover"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-xs">
-                  Pas de photo disponible
-                </div>
-              )}
-            </div>
+    <div className="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden">
+      <div className="relative h-52 w-full overflow-hidden">
+        <Image 
+          src={mainImage} 
+          alt={car.model}
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-110"
+        />
+        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-blue-600 shadow-sm">
+          {car.year_of_registration}
+        </div>
+      </div>
 
       <div className="p-5">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-gray-900">
-            {car.make} {car.model}
+        <div className="p-5">
+          <h3 className="text-lg font-bold text-gray-900 mb-1 capitalize">
+            {car.make} <span className="text-blue-600">{car.model}</span>
           </h3>
-          <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
-            {car.year_of_registration}
-          </span>
+        
         </div>
 
-        <div className="flex gap-2 mb-4">
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded capitalize">
-            {car.fuel_type}
-          </span>
-          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-            {car.engine_size} cm³
-          </span>
-        </div>
+       {/* Grille d'infos avec icônes */}
+    <div className="grid grid-cols-2 gap-3 my-4">
+      <div className="flex items-center text-gray-500 text-sm">
+        <Gauge className="w-4 h-4 mr-2 text-gray-400" />
+        {car.engine_size} cm³
+      </div>
+      <div className="flex items-center text-gray-500 text-sm">
+        <Fuel className="w-4 h-4 mr-2 text-gray-400" />
+        <span className="capitalize">{car.fuel_type}</span>
+      </div>
+    </div>
 
         {/* AFFICHAGE DES PRIX */}
         <div className="space-y-3">
@@ -76,7 +75,7 @@ export default function CarCard({ car }: CarCardProps) {
             </div>
             <Link 
               href={`/cars/${car.id}`}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="bg-blue-50 p-2 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors"
             >
               Voir détails
             </Link>
