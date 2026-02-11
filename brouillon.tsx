@@ -1,110 +1,136 @@
-// src/app/cars/[id]/page.tsx
-import { supabase } from '@/lib/supabase';
-import { calculateImportFees } from '@/lib/calculs';
-import { notFound } from 'next/navigation';
+"use client";
 
-export default async function CarDetailsPage({ 
-    params 
-}: { 
-    params: { id: string } }) {
-  // 1. Récupérer l'ID de l'URL
-  const resolvedParams = await params;
-  const id = resolvedParams.id;
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { LogOut, PlusCircle, UploadCloud, Star, X } from "lucide-react";
 
-  // 2. Fetcher les données de CETTE voiture spécifique
-  const { data: car, error } = await supabase
-    .from('cars')
-    .select('*')
-    .eq('id', id)
-    .single();
+export default function AdminPage() {
+  // ... (garder tes autres états)
+  const [files, setFiles] = useState<File[]>([]);
+  const [mainImageIndex, setMainImageIndex] = useState<number>(0); // Index de l'image principale
 
-  // Si la voiture n'existe pas ou erreur, on affiche la page 404
-  if (error || !car) {
-    notFound();
-  }
+  // ... (garder handleLogin)
 
-  // 3. Calculer les frais détaillés
-  const fees = calculateImportFees({
-    priceEuro: car.price_euro,
-    engineSize: car.engine_size,
-    fuelType: car.fuel_type,
-  });
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const formData = new FormData(e.currentTarget);
+      let imageUrls: string[] = [];
+
+      // --- ÉTAPE A : UPLOAD ---
+      if (files.length > 0) {
+        const uploadPromises = files.map(async (file) => {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random()}-${Date.now()}.${fileExt}`;
+          const filePath = `cars/${fileName}`;
+          await supabase.storage.from('car-images').upload(filePath, file);
+          const { data: { publicUrl } } = supabase.storage.from('car-images').getPublicUrl(filePath);
+          return publicUrl;
+        });
+
+        imageUrls = await Promise.all(uploadPromises);
+
+        // --- ÉTAPE B : RÉORGANISATION ---
+        // On place l'image choisie en première position du tableau
+        const primary = imageUrls[mainImageIndex];
+        const others = imageUrls.filter((_, idx) => idx !== mainImageIndex);
+        imageUrls = [primary, ...others];
+      }
+
+      // --- ÉTAPE C : INSERTION ---
+      const newCar = {
+        make: formData.get("make") as string,
+        // ... (tes autres champs identiques)
+        model: formData.get("model") as string,
+        year_of_registration: parseInt(formData.get("year") as string),
+        price_euro: parseFloat(formData.get("price") as string),
+        fuel_type: formData.get("fuel") as string,
+        engine_size: parseInt(formData.get("engine") as string),
+        mileage: parseInt(formData.get("mileage") as string),
+        first_registration_date: formData.get("date") as string,
+        images: imageUrls, 
+      };
+
+      const { error: insertError } = await supabase.from("cars").insert([newCar]);
+      if (insertError) throw insertError;
+
+      setMessage("Annonce publiée avec l'image principale choisie ! 🚀");
+      setFiles([]);
+      setMainImageIndex(0);
+      (e.target as HTMLFormElement).reset();
+
+    } catch (error: any) {
+      setMessage("Erreur : " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* BOUTON RETOUR */}
-        <a href="/" className="text-blue-600 hover:underline mb-6 inline-block">
-          ← Retour au catalogue
-        </a>
+    <main className="min-h-screen bg-gray-50 p-6 md:p-12">
+      <div className="max-w-3xl mx-auto">
+        {/* ... Header ... */}
+        
+        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100">
+          
+          {/* ... Tes champs (make, model, etc.) ... */}
 
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* BANNIÈRE TITRE */}
-          <div className="bg-gray-900 text-white p-8">
-            <h1 className="text-4xl font-bold">
-              {car.make} {car.model}
-            </h1>
-            <p className="text-gray-400 mt-2">Mise en circulation : {car.first_registration_date}</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
-            {/* COLONNE GAUCHE : INFOS TECHNIQUES */}
-            <div>
-              <h2 className="text-xl font-bold mb-4 border-b pb-2">Fiche Technique</h2>
-              <ul className="space-y-3">
-                <li className="flex justify-between">
-                  <span className="text-gray-500">Énergie</span>
-                  <span className="font-semibold capitalize">{car.fuel_type}</span>
-                </li>
-                <li className="flex justify-between">
-                  <span className="text-gray-500">Cylindrée</span>
-                  <span className="font-semibold">{car.engine_size} cm³</span>
-                </li>
-                <li className="flex justify-between">
-                  <span className="text-gray-500">Kilométrage</span>
-                  <span className="font-semibold">{car.mileage?.toLocaleString()} km</span>
-                </li>
-              </ul>
+          {/* ZONE D'UPLOAD AMÉLIORÉE */}
+          <div className="space-y-4">
+            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Photos du véhicule</label>
+            
+            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-blue-400 transition-colors relative bg-gray-50">
+              <input 
+                type="file" multiple accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setFiles(Array.from(e.target.files));
+                    setMainImageIndex(0); // Reset l'image principale au premier fichier
+                  }
+                }}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <UploadCloud className="mx-auto text-gray-300 mb-2" size={32} />
+              <p className="text-sm text-gray-500 italic">Cliquez pour ajouter des photos</p>
             </div>
 
-            {/* COLONNE DROITE : RÉCAPITULATIF FINANCIER */}
-            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-              <h2 className="text-xl font-bold text-blue-900 mb-4">Coût de revient total</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-blue-700">Prix véhicule (Europe)</span>
-                  <span className="font-bold">{car.price_euro.toLocaleString()} €</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-blue-700">Dédouanement (Est.)</span>
-                  <span className="font-bold text-orange-600">+{fees.customsFees.toLocaleString()} €</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-blue-700">Fret & Logistique</span>
-                  <span className="font-bold">+{fees.transportFees} €</span>
-                </div>
-                <div className="pt-4 border-t border-blue-200 mt-4">
-                  <p className="text-sm text-blue-600 font-medium">Prix Total (Rendu Alger)</p>
-                  <p className="text-3xl font-black text-blue-900">
-                    {Math.round(fees.totalDZD).toLocaleString()} DA
-                  </p>
-                </div>
+            {/* PRÉVISUALISATION ET CHOIX DE LA PHOTO PRINCIPALE */}
+            {files.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mt-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                {files.map((file, index) => (
+                  <div 
+                    key={index}
+                    onClick={() => setMainImageIndex(index)}
+                    className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer border-4 transition-all ${
+                      mainImageIndex === index ? "border-blue-500 scale-105 shadow-lg" : "border-transparent opacity-60"
+                    }`}
+                  >
+                    <img 
+                      src={URL.createObjectURL(file)} 
+                      alt="preview" 
+                      className="w-full h-full object-cover" 
+                    />
+                    {mainImageIndex === index && (
+                      <div className="absolute top-1 right-1 bg-blue-500 text-white p-1 rounded-full">
+                        <Star size={12} fill="currentColor" />
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
+            {files.length > 0 && (
+              <p className="text-xs text-center text-blue-600 font-medium">
+                ⭐ Cliquez sur une photo pour la définir comme image principale (couverture)
+              </p>
+            )}
           </div>
-          {/* AJOUT DU BOUTON WHATSAPP (Ton défi) */}
-          <div className="p-8 border-t border-gray-100 bg-gray-50 text-center">
-            <a 
-              href={`https://wa.me/213770000000?text=Bonjour, je suis intéressé par la ${car.make} ${car.model} affichée sur votre site.`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-green-600 text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-green-700 transition-all transform hover:scale-105 shadow-lg"
-            >
-              <span>Contacter sur WhatsApp</span>
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.588-5.946 0-6.556 5.332-11.888 11.888-11.888 3.176 0 6.161 1.237 8.404 3.48s3.481 5.229 3.481 8.404c0 6.556-5.332 11.888-11.888 11.888-2.01 0-3.987-.508-5.741-1.472l-6.143 1.612zm6.189-3.921c1.597.949 3.19 1.425 4.735 1.425 5.232 0 9.49-4.258 9.49-9.49 0-2.535-1.01-4.918-2.846-6.754s-4.219-2.846-6.754-2.846c-5.232 0-9.49 4.258-9.49 9.49 0 1.691.464 3.245 1.341 4.637l-1.012 3.693 3.836-.985z"/></svg>
-            </a>
-          </div>
-        </div>
+
+          {/* ... Bouton Submit ... */}
+        </form>
       </div>
     </main>
   );
