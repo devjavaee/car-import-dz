@@ -19,7 +19,37 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+  // --- AUTHENTIFICATION SÉCURISÉE ---
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const res = await fetch("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (res.ok) {
+      setIsAuthenticated(true);
+      setPassword("");
+    } else {
+      alert("Mot de passe incorrect !");
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch("/api/logout", { method: "POST" });
+    setIsAuthenticated(false);
+    window.location.reload();
+  };
+
+  useEffect(() => {
+    async function checkAuth() {
+      const res = await fetch("/api/auth-check");
+      const data = await res.json();
+      if (data.authenticated) setIsAuthenticated(true);
+    }
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     async function fetchInventory() {
@@ -29,40 +59,44 @@ export default function AdminPage() {
     if (isAuthenticated) fetchInventory();
   }, [isAuthenticated, refreshKey]);
 
-  // Remplace ton handleLogin par celui-ci :
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  const res = await fetch("/api/login", {
-    method: "POST",
-    body: JSON.stringify({ password }),
-    headers: { "Content-Type": "application/json" },
-  });
+  // --- LOGIQUE DE NETTOYAGE STORAGE + SUPPRESSION ---
+  const handleDeleteCar = async (car: any) => {
+    if (!confirm(`Supprimer définitivement l'annonce ${car.make} ${car.model} ainsi que toutes ses photos ?`)) return;
 
-  if (res.ok) {
-    setIsAuthenticated(true);
-    setPassword("");
-  } else {
-    alert("Mot de passe incorrect !");
-  }
-};
-//deconnexion
-const handleLogout = async () => {
-  await fetch("/api/logout", { method: "POST" });
-  setIsAuthenticated(false);
-  window.location.reload(); // Optionnel : pour nettoyer proprement l'état
-};
+    try {
+      setLoading(true);
+      // 1. Suppression des fichiers physiques dans le Storage Supabase
+      if (car.images && car.images.length > 0) {
+        const filePaths = car.images.map((url: string) => {
+          const parts = url.split('car-images/');
+          return parts[1];
+        });
 
-// Ajoute un useEffect pour vérifier la session au chargement :
-useEffect(() => {
-  async function checkAuth() {
-    const res = await fetch("/api/auth-check");
-    const data = await res.json();
-    if (data.authenticated) setIsAuthenticated(true);
-  }
-  checkAuth();
-}, []);
+        const { error: storageError } = await supabase.storage
+          .from('car-images')
+          .remove(filePaths);
 
-  // --- NOUVELLE FONCTION : SUPPRIMER UNE PHOTO DE LA SÉLECTION ---
+        if (storageError) console.error("Erreur nettoyage Storage:", storageError);
+      }
+
+      // 2. Suppression de la ligne SQL
+      const { error: dbError } = await supabase
+        .from('cars')
+        .delete()
+        .eq('id', car.id);
+
+      if (dbError) throw dbError;
+
+      setMessage("Annonce et photos supprimées avec succès !");
+      setRefreshKey(prev => prev + 1);
+    } catch (error: any) {
+      alert("Erreur lors de la suppression : " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- GESTION DES FICHIERS ---
   const removeFile = (indexToRemove: number) => {
     setFiles(files.filter((_, index) => index !== indexToRemove));
     if (mainImageIndex === indexToRemove) {
@@ -72,41 +106,38 @@ useEffect(() => {
     }
   };
 
+  // --- ÉDITION ---
   const handleEditClick = (car: any) => {
     setEditingId(car.id);
-    setFiles([]); // Reset des fichiers pour laisser place aux nouveaux si besoin
+    setFiles([]); 
     setMainImageIndex(0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
-    if (formRef.current) {
-      const f = formRef.current;
-      (f.elements.namedItem("make") as HTMLInputElement).value = car.make;
-      (f.elements.namedItem("model") as HTMLInputElement).value = car.model;
-      (f.elements.namedItem("year") as HTMLInputElement).value = car.year_of_registration.toString();
-      (f.elements.namedItem("price") as HTMLInputElement).value = car.price_euro.toString();
-      (f.elements.namedItem("engine") as HTMLInputElement).value = car.engine_size.toString();
-      (f.elements.namedItem("mileage") as HTMLInputElement).value = car.mileage.toString();
-      (f.elements.namedItem("date") as HTMLInputElement).value = car.first_registration_date;
-      (f.elements.namedItem("fuel") as HTMLSelectElement).value = car.fuel_type;
-    }
+    setTimeout(() => {
+      if (formRef.current) {
+        const f = formRef.current;
+        (f.elements.namedItem("make") as HTMLInputElement).value = car.make;
+        (f.elements.namedItem("model") as HTMLInputElement).value = car.model;
+        (f.elements.namedItem("year") as HTMLInputElement).value = car.year_of_registration.toString();
+        (f.elements.namedItem("price") as HTMLInputElement).value = car.price_euro.toString();
+        (f.elements.namedItem("engine") as HTMLInputElement).value = car.engine_size.toString();
+        (f.elements.namedItem("mileage") as HTMLInputElement).value = car.mileage.toString();
+        (f.elements.namedItem("date") as HTMLInputElement).value = car.first_registration_date;
+        (f.elements.namedItem("fuel") as HTMLSelectElement).value = car.fuel_type;
+      }
+    }, 100);
     setMessage("Mode édition activé : " + car.make + " " + car.model);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setFiles([]); // Nettoie les miniatures
+    setFiles([]); 
     setMainImageIndex(0);
     formRef.current?.reset();
     setMessage("");
   };
 
-  const handleDeleteCar = async (id: string) => {
-    if (confirm("Supprimer définitivement cette annonce ?")) {
-      const { error } = await supabase.from('cars').delete().eq('id', id);
-      if (!error) setRefreshKey(prev => prev + 1);
-    }
-  };
-
+  // --- SOUMISSION DU FORMULAIRE ---
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -116,44 +147,33 @@ useEffect(() => {
       const formData = new FormData(e.currentTarget);
       let imageUrls: string[] = [];
 
-      // --- CONFIGURATION DE LA COMPRESSION ---
-const compressionOptions = {
-  maxSizeMB: 0.8,          // Taille max (800 Ko, parfait pour le web)
-  maxWidthOrHeight: 1280,  // Redimensionne les photos 4K en HD standard
-  useWebWorker: true,
-};
+      const compressionOptions = {
+        maxSizeMB: 0.8,
+        maxWidthOrHeight: 1280,
+        useWebWorker: true,
+      };
 
-if (files.length > 0) {
-  const uploadPromises = files.map(async (file) => {
-    try {
-      // ÉTAPE 1 : COMPRESSION
-      const compressedFile = await imageCompression(file, compressionOptions);
-      
-      // ÉTAPE 2 : PRÉPARATION DU NOM
-      const fileName = `${Math.random()}-${Date.now()}.jpg`; // On force le .jpg pour plus de légèreté
-      const filePath = `cars/${fileName}`;
+      if (files.length > 0) {
+        const uploadPromises = files.map(async (file) => {
+          const compressedFile = await imageCompression(file, compressionOptions);
+          const fileName = `${Math.random()}-${Date.now()}.jpg`;
+          const filePath = `cars/${fileName}`;
 
-      // ÉTAPE 3 : ENVOI VERS SUPABASE
-      const { error: uploadError } = await supabase.storage
-        .from('car-images')
-        .upload(filePath, compressedFile);
+          const { error: uploadError } = await supabase.storage
+            .from('car-images')
+            .upload(filePath, compressedFile);
 
-      if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('car-images')
-        .getPublicUrl(filePath);
-      
-      return publicUrl;
-    } catch (err) {
-      console.error("Erreur compression/upload:", err);
-      throw err;
-    }
-  });
+          const { data: { publicUrl } } = supabase.storage
+            .from('car-images')
+            .getPublicUrl(filePath);
+          
+          return publicUrl;
+        });
         
         imageUrls = await Promise.all(uploadPromises);
-        
-        // Applique l'ordre de l'image principale
+        // Réorganiser pour mettre l'image principale en premier
         const primary = imageUrls[mainImageIndex];
         const others = imageUrls.filter((_, idx) => idx !== mainImageIndex);
         imageUrls = [primary, ...others];
@@ -170,7 +190,6 @@ if (files.length > 0) {
         first_registration_date: formData.get("date") as string,
       };
 
-      // Si on a mis de nouvelles images, on met à jour le champ images
       if (imageUrls.length > 0) carData.images = imageUrls;
 
       const { error: dbError } = editingId 
@@ -193,15 +212,16 @@ if (files.length > 0) {
     }
   };
 
+  // --- RENDU UI LOGIN ---
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-        <form onSubmit={handleLogin} className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md text-center text-gray-900">
+        <form onSubmit={handleLogin} className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md text-center">
           <h1 className="text-3xl font-black mb-6 italic text-gray-900">ADMIN <span className="text-blue-600">AUTO</span></h1>
           <input 
             type="password" 
             placeholder="Mot de passe"
-            className="w-full p-4 border border-gray-200 rounded-2xl mb-4 outline-none focus:ring-4 focus:ring-blue-100 transition-all"
+            className="w-full p-4 border border-gray-200 rounded-2xl mb-4 outline-none focus:ring-4 focus:ring-blue-100 transition-all text-gray-900"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
@@ -211,12 +231,13 @@ if (files.length > 0) {
     );
   }
 
+  // --- RENDU UI DASHBOARD ---
   return (
     <main className="min-h-screen bg-gray-50 p-6 md:p-12 text-gray-900">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-between items-center mb-10">
           <h1 className="text-3xl font-black">{editingId ? "Modifier l'annonce" : "Nouveau Véhicule"}</h1>
-          <button onClick={() => setIsAuthenticated(false)} className="flex items-center gap-2 text-red-500 font-bold hover:bg-red-50 p-2 rounded-lg transition-colors">
+          <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 font-bold hover:bg-red-50 p-2 rounded-lg transition-colors">
             <LogOut size={18} /> Quitter
           </button>
         </div>
@@ -248,7 +269,7 @@ if (files.length > 0) {
             <option value="electrique">Électrique</option>
           </select>
 
-          {/* ZONE PHOTOS AVEC PRÉVISUALISATION CORRIGÉE */}
+          {/* ZONE PHOTOS AVEC ÉTOILE ⭐ */}
           <div className="space-y-4">
             <label className="text-xs font-bold text-gray-400 uppercase ml-1">
               Photos {editingId && "(Optionnel : remplacera les anciennes)"}
@@ -270,7 +291,6 @@ if (files.length > 0) {
               <p className="text-sm text-gray-500 italic">Cliquez pour ajouter des photos</p>
             </div>
 
-            {/* GRILLE DE MINIATURES (FONCTIONNE EN AJOUT ET EN MODIF) */}
             {files.length > 0 && (
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mt-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 {files.map((file, index) => (
@@ -282,8 +302,10 @@ if (files.length > 0) {
                       }`}
                     >
                       <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover" />
+                      
+                      {/* INDICATEUR ÉTOILE ⭐ */}
                       {mainImageIndex === index && (
-                        <div className="absolute top-1 left-1 bg-blue-500 text-white p-1 rounded-full">
+                        <div className="absolute top-1 left-1 bg-blue-500 text-white p-1 rounded-full shadow-lg">
                           <Star size={10} fill="currentColor" />
                         </div>
                       )}
@@ -313,7 +335,7 @@ if (files.length > 0) {
           {message && <div className={`p-4 rounded-2xl text-center font-bold ${message.includes("Erreur") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"}`}>{message}</div>}
         </form>
 
-        {/* SECTION INVENTAIRE */}
+        {/* SECTION INVENTAIRE AVEC BOUTON SUPPRESSION NETTOYAGE */}
         <section className="mt-20 mb-20">
           <h2 className="text-2xl font-black mb-6 flex items-center gap-2"><Car className="text-blue-600" /> Stock Actuel ({inventory.length})</h2>
           <div className="grid gap-4">
@@ -328,7 +350,7 @@ if (files.length > 0) {
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => handleEditClick(car)} className="p-3 text-blue-500 hover:bg-blue-50 rounded-xl transition-all" title="Modifier"><Edit3 size={18} /></button>
-                  <button onClick={() => handleDeleteCar(car.id)} className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-all" title="Supprimer"><Trash2 size={18} /></button>
+                  <button onClick={() => handleDeleteCar(car)} className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-all" title="Supprimer"><Trash2 size={18} /></button>
                 </div>
               </div>
             ))}
