@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { calculateImportFees } from "@/lib/calculs";
+import { ArrowLeft } from "lucide-react"; // Importation de l'icône
+import Link from "next/link"; // Utilisation de Link pour une navigation rapide
 
 export default function SimulateurPage() {
   // États pour le formulaire
@@ -24,50 +26,63 @@ export default function SimulateurPage() {
 
   return (
     <main className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-          Simulateur d'Importation 🇩🇿
-        </h1>
-        <p className="text-gray-600 text-center mb-10">
-          Estimez le coût de revient de votre véhicule (Loi de moins de 3 ans)
-        </p>
+      <div className="max-w-4xl mx-auto">
+        
+        {/* LIEN DE RETOUR */}
+        <Link 
+          href="/" 
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-blue-600 font-medium mb-8 transition-colors group"
+        >
+          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> 
+          Retour au catalogue
+        </Link>
+
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-black text-gray-900 mb-3">
+            Simulateur d'Importation <span className="text-blue-600">🇩🇿</span>
+          </h1>
+          <p className="text-gray-600 max-w-xl mx-auto">
+            Estimez le coût de revient total de votre véhicule en Algérie selon la loi de finances (véhicules de moins de 3 ans).
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* SECTION FORMULAIRE */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <div className="space-y-4">
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+            <h2 className="text-lg font-bold mb-6 text-gray-800">Configuration du véhicule</h2>
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-bold text-gray-400 uppercase mb-2">
                   Prix du véhicule (EUR)
                 </label>
                 <input
                   type="number"
                   value={price}
                   onChange={(e) => setPrice(Number(e.target.value))}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-bold text-gray-400 uppercase mb-2">
                   Cylindrée (cm³)
                 </label>
                 <input
                   type="number"
                   value={engine}
                   onChange={(e) => setEngine(Number(e.target.value))}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-bold text-gray-400 uppercase mb-2">
                   Carburant
                 </label>
                 <select
                   value={fuel}
                   onChange={(e) => setFuel(e.target.value as any)}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold cursor-pointer"
                 >
                   <option value="essence">Essence</option>
                   <option value="hybride">Hybride</option>
@@ -78,47 +93,56 @@ export default function SimulateurPage() {
           </div>
 
           {/* SECTION RÉSULTATS */}
-          <div className="bg-blue-600 text-white p-6 rounded-xl shadow-lg flex flex-col justify-center">
-            <h2 className="text-xl font-semibold mb-6">Estimation Totale</h2>
-            
-            {results && (
-              <div className="space-y-4">
-                {/* ALERTE TAXE ÉLEVÉE */}
-                {results.taxRate >= 0.80 && (
-                  <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-800 p-3 rounded mb-4 animate-pulse">
-                    <p className="font-bold text-sm">⚠️ Attention</p>
-                    <p className="text-xs">Cylindrée élevée : les taxes douanières dépassent 80% du prix.</p>
-                  </div>
-                )}
+          <div className="bg-blue-600 text-white p-8 rounded-3xl shadow-xl shadow-blue-100 flex flex-col justify-between relative overflow-hidden">
+            <div className="relative z-10">
+              <h2 className="text-xl font-bold mb-8 opacity-90">Estimation des frais</h2>
+              
+              {results && (
+                <div className="space-y-5">
+                  {/* ALERTE TAXE ÉLEVÉE */}
+                  {results.taxRate >= 0.80 && (
+                    <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl mb-6">
+                      <p className="font-bold text-sm flex items-center gap-2">
+                        ⚠️ Attention
+                      </p>
+                      <p className="text-xs opacity-80 mt-1">Cylindrée élevée : les taxes douanières sont très importantes pour ce type de moteur.</p>
+                    </div>
+                  )}
 
-                <div className="flex justify-between border-b border-blue-400 pb-2">
-                  <span>Taux appliqué :</span>
-                  <span className="font-mono">{(results.taxRate * 100)} %</span>
-                </div>
+                  <div className="flex justify-between items-center py-2 border-b border-white/10">
+                    <span className="opacity-70 text-sm">Taux de taxe :</span>
+                    <span className="font-bold">{(results.taxRate * 100)} %</span>
+                  </div>
 
-                <div className="flex justify-between border-b border-blue-400 pb-2">
-                  <span>Douane & Taxes :</span>
-                  <span className="font-mono">{results.customsFees.toLocaleString()} €</span>
-                </div>
-                <div className="flex justify-between border-b border-blue-400 pb-2">
-                  <span>Transport estimé :</span>
-                  <span>{results.transportFees} €</span>
-                </div>
-                <div className="mt-6">
-                  <span className="text-blue-100 text-sm">Prix final rendu Alger :</span>
-                  <div className="text-3xl font-bold mt-1">
-                    {results.totalEuro.toLocaleString()} €
+                  <div className="flex justify-between items-center py-2 border-b border-white/10">
+                    <span className="opacity-70 text-sm">Douane & Taxes :</span>
+                    <span className="font-bold">+{results.customsFees.toLocaleString()} €</span>
                   </div>
-                  <div className="text-blue-200 text-lg italic">
-                    ≈ {results.totalDZD.toLocaleString()} DZD
+                  
+                  <div className="flex justify-between items-center py-2 border-b border-white/10">
+                    <span className="opacity-70 text-sm">Transport (estimé) :</span>
+                    <span className="font-bold">{results.transportFees} €</span>
+                  </div>
+
+                  <div className="mt-10">
+                    <p className="text-xs uppercase font-black text-blue-200 mb-1">Total Rendu Alger</p>
+                    <div className="text-4xl font-black italic">
+                      {results.totalEuro.toLocaleString()} €
+                    </div>
+                    <div className="text-blue-100 text-xl font-medium mt-1">
+                      ≈ {results.totalDZD.toLocaleString()} DA
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             
-            <p className="text-[10px] text-blue-200 mt-8 italic">
-              *Taux de change indicatif (Marché parallèle). Les taxes réelles dépendent du bureau de douane.
+            <p className="relative z-10 text-[10px] text-blue-200 mt-8 italic leading-relaxed">
+              *Simulation basée sur le marché parallèle. Les montants réels sont calculés par l'administration des douanes lors du dédouanement.
             </p>
+            
+            {/* Décoration d'arrière-plan */}
+            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
           </div>
         </div>
       </div>

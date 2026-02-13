@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { LogOut, PlusCircle, UploadCloud, Star, X, Car, Trash2, Edit3, Save } from "lucide-react";
+import imageCompression from "browser-image-compression";
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -88,14 +89,40 @@ export default function AdminPage() {
       const formData = new FormData(e.currentTarget);
       let imageUrls: string[] = [];
 
-      if (files.length > 0) {
-        const uploadPromises = files.map(async (file) => {
-          const fileName = `${Math.random()}-${Date.now()}.${file.name.split('.').pop()}`;
-          const filePath = `cars/${fileName}`;
-          await supabase.storage.from('car-images').upload(filePath, file);
-          const { data: { publicUrl } } = supabase.storage.from('car-images').getPublicUrl(filePath);
-          return publicUrl;
-        });
+      // --- CONFIGURATION DE LA COMPRESSION ---
+const compressionOptions = {
+  maxSizeMB: 0.8,          // Taille max (800 Ko, parfait pour le web)
+  maxWidthOrHeight: 1280,  // Redimensionne les photos 4K en HD standard
+  useWebWorker: true,
+};
+
+if (files.length > 0) {
+  const uploadPromises = files.map(async (file) => {
+    try {
+      // ÉTAPE 1 : COMPRESSION
+      const compressedFile = await imageCompression(file, compressionOptions);
+      
+      // ÉTAPE 2 : PRÉPARATION DU NOM
+      const fileName = `${Math.random()}-${Date.now()}.jpg`; // On force le .jpg pour plus de légèreté
+      const filePath = `cars/${fileName}`;
+
+      // ÉTAPE 3 : ENVOI VERS SUPABASE
+      const { error: uploadError } = await supabase.storage
+        .from('car-images')
+        .upload(filePath, compressedFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('car-images')
+        .getPublicUrl(filePath);
+      
+      return publicUrl;
+    } catch (err) {
+      console.error("Erreur compression/upload:", err);
+      throw err;
+    }
+  });
         
         imageUrls = await Promise.all(uploadPromises);
         
