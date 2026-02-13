@@ -1,0 +1,14 @@
+import { NextResponse } from "next/server";
+
+export async function POST() {
+  const response = NextResponse.json({ success: true });
+  
+  // On supprime le cookie en le mettant à zéro
+  response.cookies.set("admin_session", "", {
+    httpOnly: true,
+    expires: new Date(0),
+    path: "/",
+  });
+
+  return response;
+}

@@ -29,11 +29,38 @@ export default function AdminPage() {
     if (isAuthenticated) fetchInventory();
   }, [isAuthenticated, refreshKey]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password === ADMIN_PASSWORD) setIsAuthenticated(true);
-    else alert("Mot de passe incorrect !");
-  };
+  // Remplace ton handleLogin par celui-ci :
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  const res = await fetch("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (res.ok) {
+    setIsAuthenticated(true);
+    setPassword("");
+  } else {
+    alert("Mot de passe incorrect !");
+  }
+};
+//deconnexion
+const handleLogout = async () => {
+  await fetch("/api/logout", { method: "POST" });
+  setIsAuthenticated(false);
+  window.location.reload(); // Optionnel : pour nettoyer proprement l'état
+};
+
+// Ajoute un useEffect pour vérifier la session au chargement :
+useEffect(() => {
+  async function checkAuth() {
+    const res = await fetch("/api/auth-check");
+    const data = await res.json();
+    if (data.authenticated) setIsAuthenticated(true);
+  }
+  checkAuth();
+}, []);
 
   // --- NOUVELLE FONCTION : SUPPRIMER UNE PHOTO DE LA SÉLECTION ---
   const removeFile = (indexToRemove: number) => {
